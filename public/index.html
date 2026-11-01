@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f17">
+  <title>Musty BX — AI digit trading bot for Deriv</title>
+  <meta name="description" content="Log in with your Deriv account and let a six-layer AI digit engine analyse synthetic indices and trade for you, with stop-loss and take-profit built in.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="landing">
+  <main class="hero">
+    <div class="brand big"><span class="brand-mark">BX</span><span class="brand-name">Musty BX</span></div>
+    <h1>AI digit trading for Deriv synthetic indices</h1>
+    <p class="lead">Connect your Deriv account in one tap. A six-layer engine reads every tick — frequency, recency, gaps, cycles, entropy and streaks — then trades Differs, Matches, Even/Odd or Over/Under for you.</p>
+
+    <div id="error" class="notice error" hidden></div>
+
+    <div class="cta" id="ctaGuest">
+      <a class="btn primary big-btn" href="/login">Log in with Deriv</a>
+      <a class="btn ghost big-btn" href="/login?signup=1">Create a free Deriv account</a>
+    </div>
+    <div class="cta" id="ctaUser" hidden>
+      <a class="btn primary big-btn" href="/app">Open dashboard</a>
+      <a class="btn ghost big-btn" href="/logout">Log out</a>
+    </div>
+
+    <ul class="features">
+      <li><strong>Secure login.</strong> You sign in on Deriv's own page. We never see your password, and you can revoke access any time.</li>
+      <li><strong>Demo first.</strong> Practise on a demo account with virtual money before going real.</li>
+      <li><strong>Risk controls.</strong> Stake, take-profit, stop-loss, max trades and optional capped martingale.</li>
+      <li><strong>Live.</strong> Real-time ticks, balance and results straight from Deriv's API.</li>
+    </ul>
+  </main>
+
+  <footer class="foot small muted">
+    Musty BX is an independent app built on the Deriv API and is not affiliated with Deriv.
+    Signals are statistical estimates, not guarantees. Trading involves risk of loss — only trade money you can afford to lose.
+  </footer>
+
+  <script src="/js/landing.js"></script>
+</body>
+</html>

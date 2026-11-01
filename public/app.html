@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f17">
+  <title>Musty BX — Dashboard</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">BX</span><span class="brand-name">Musty BX</span></a>
+    <div class="account">
+      <select id="accountSelect" aria-label="Trading account"></select>
+      <span id="modeBadge" class="badge">—</span>
+    </div>
+    <div class="balance-wrap">
+      <span class="muted small">Balance</span>
+      <strong id="balance">—</strong>
+    </div>
+    <a class="logout" href="/logout" title="Log out">Log out</a>
+  </header>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <div id="noAccount" class="card center" hidden>
+    <h2>No trading account yet</h2>
+    <p class="muted">Create a free demo account with $10,000 virtual money to try the bot.</p>
+    <button id="createDemo" class="btn primary">Create demo account</button>
+  </div>
+
+  <main id="dash" class="grid" hidden>
+    <!-- MARKET -->
+    <section class="card" id="marketCard">
+      <div class="card-head">
+        <h2>Market</h2>
+        <span id="connDot" class="dot" title="Connection"></span>
+      </div>
+      <label class="field">
+        <span>Symbol</span>
+        <select id="symbolSelect"></select>
+      </label>
+      <div class="price-row">
+        <div>
+          <div class="muted small">Last price</div>
+          <div id="price" class="price">—</div>
+        </div>
+        <div id="lastDigit" class="digit-big">–</div>
+      </div>
+      <div class="muted small">Recent digits (newest right)</div>
+      <div id="digitStrip" class="strip"></div>
+      <div class="muted small" id="tickCount">0 ticks loaded</div>
+    </section>
+
+    <!-- SIGNAL -->
+    <section class="card" id="signalCard">
+      <div class="card-head">
+        <h2>AI signal</h2>
+        <span class="muted small" id="entropyInfo"></span>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Strategy</span>
+          <select id="strategySelect">
+            <option value="DIGITDIFF">Differs (AI digit)</option>
+            <option value="DIGITMATCH">Matches (AI digit)</option>
+            <option value="EVENODD">Even / Odd</option>
+            <option value="OVERUNDER">Over / Under</option>
+          </select>
+        </label>
+        <label class="field" id="barrierField" hidden>
+          <span>Barrier</span>
+          <select id="barrierSelect">
+            <option>1</option><option>2</option><option>3</option><option selected>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Window</span>
+          <select id="windowSelect">
+            <option value="100">100 ticks</option>
+            <option value="250">250 ticks</option>
+            <option value="500" selected>500 ticks</option>
+            <option value="1000">1000 ticks</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="signal-box">
+        <div>
+          <div class="muted small">Next trade</div>
+          <div id="signalLabel" class="signal-label">Waiting for ticks…</div>
+        </div>
+        <div class="conf">
+          <div class="muted small">Confidence</div>
+          <div id="confValue" class="conf-value">0</div>
+        </div>
+      </div>
+      <div class="meter"><div id="confBar" class="meter-fill"></div></div>
+      <div class="small muted" id="signalOdds"></div>
+      <div class="small muted" id="streakInfo"></div>
+
+      <div class="bars" id="digitBars" aria-label="Digit probabilities"></div>
+      <div class="legend small muted"><span class="sw sw-prob"></span> AI estimate for next digit &nbsp; <span class="sw sw-pick"></span> pick</div>
+
+      <details class="layers">
+        <summary>Six-layer breakdown</summary>
+        <table>
+          <thead><tr><th>Layer</th><th>Leans to</th><th>Note</th></tr></thead>
+          <tbody id="layerTable"></tbody>
+        </table>
+      </details>
+    </section>
+
+    <!-- TRADE -->
+    <section class="card" id="tradeCard">
+      <div class="card-head"><h2>Trade</h2><span id="botState" class="badge">Idle</span></div>
+      <div class="row">
+        <label class="field"><span>Stake (USD)</span><input id="stake" type="number" min="0.35" step="0.01" value="1" inputmode="decimal"></label>
+        <label class="field"><span>Ticks</span><input id="ticks" type="number" min="1" max="10" step="1" value="1" inputmode="numeric"></label>
+      </div>
+      <button id="tradeNow" class="btn primary wide">Trade signal now</button>
+
+      <h3>Auto-trade</h3>
+      <div class="row">
+        <label class="field"><span>Min confidence</span><input id="minConf" type="number" min="0" max="100" step="5" value="50" inputmode="numeric"></label>
+        <label class="field"><span>Max trades</span><input id="maxTrades" type="number" min="1" step="1" value="20" inputmode="numeric"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Take profit ($)</span><input id="takeProfit" type="number" min="0" step="0.5" value="5" inputmode="decimal"></label>
+        <label class="field"><span>Stop loss ($)</span><input id="stopLoss" type="number" min="0" step="0.5" value="5" inputmode="decimal"></label>
+      </div>
+      <label class="check"><input id="martingale" type="checkbox"> Martingale after a loss</label>
+      <div class="row" id="martingaleRow" hidden>
+        <label class="field"><span>Multiplier</span><input id="martMult" type="number" min="1" step="0.1" value="2" inputmode="decimal"></label>
+        <label class="field"><span>Max steps</span><input id="martSteps" type="number" min="1" max="10" step="1" value="3" inputmode="numeric"></label>
+      </div>
+      <label class="check danger" id="realAck" hidden><input id="realAckBox" type="checkbox"> I understand this account uses real money</label>
+      <button id="autoBtn" class="btn wide">Start auto-trade</button>
+      <div id="autoStatus" class="small muted"></div>
+      <button id="resetDemo" class="btn ghost small-btn" hidden>Reset demo balance</button>
+    </section>
+
+    <!-- SESSION -->
+    <section class="card" id="sessionCard">
+      <div class="card-head"><h2>Session</h2><button id="clearLog" class="btn ghost small-btn">Clear</button></div>
+      <div class="stats">
+        <div><span class="muted small">Trades</span><strong id="stTrades">0</strong></div>
+        <div><span class="muted small">Won</span><strong id="stWins">0</strong></div>
+        <div><span class="muted small">Lost</span><strong id="stLosses">0</strong></div>
+        <div><span class="muted small">Win rate</span><strong id="stRate">—</strong></div>
+        <div><span class="muted small">Net P/L</span><strong id="stPL">0.00</strong></div>
+      </div>
+      <div class="table-wrap">
+        <table class="log">
+          <thead><tr><th>Time</th><th>Contract</th><th>Stake</th><th>Exit</th><th>P/L</th></tr></thead>
+          <tbody id="tradeLog"><tr class="empty"><td colspan="5">No trades yet</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot small muted">
+    Musty BX is an independent app built on the Deriv API and is not affiliated with Deriv.
+    Signals are statistical estimates, not guarantees. Trading involves risk of loss.
+  </footer>
+
+  <script src="/js/engine.js"></script>
+  <script src="/js/deriv.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "mustybx",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Musty BX — AI digit trading bot for Deriv synthetic indices (Deriv OAuth 2.0 + options WebSocket API).",
+  "scripts": {
+    "test": "node test/engine.test.js",
+    "test:e2e": "node test/e2e.js",
+    "dev": "node test/serve.js"
+  }
+}
