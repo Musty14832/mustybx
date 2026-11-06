@@ -31,6 +31,78 @@
   </div>
 
   <main id="dash" class="grid" hidden>
+    <!-- GOALIQ -->
+    <section class="card" id="goalCard">
+      <div class="card-head">
+        <h2>GoalIQ-Ultimate <span class="muted small">market scanner</span></h2>
+        <span id="goalScanInfo" class="muted small">Loading markets…</span>
+      </div>
+
+      <div class="goal-top">
+        <div class="goal-report">
+          <div class="muted small">Auto-selected market</div>
+          <div id="goalPick" class="signal-label">Scanning…</div>
+          <div id="goalPickSub" class="small muted"></div>
+          <div class="goal-stats">
+            <div><span class="muted small">S<sub>comp</sub></span><strong id="goalScore">—</strong></div>
+            <div><span class="muted small">Model P</span><strong id="goalP">—</strong></div>
+            <div><span class="muted small">Implied P</span><strong id="goalIP">—</strong></div>
+            <div><span class="muted small">EV</span><strong id="goalEV">—</strong></div>
+            <div><span class="muted small">Stake</span><strong id="goalStake">—</strong></div>
+          </div>
+          <div class="meter"><div id="goalBar" class="meter-fill"></div></div>
+          <div class="gates" id="goalGates"></div>
+          <div class="small risk-line" id="riskLine"></div>
+        </div>
+
+        <div class="goal-rank">
+          <div class="table-wrap">
+            <table class="rank">
+              <thead><tr><th>#</th><th>Market</th><th>MSI</th><th>Trade</th><th>S<sub>comp</sub></th><th>P</th><th>EV</th><th>Status</th></tr></thead>
+              <tbody id="rankBody"><tr class="empty"><td colspan="8">Connecting to Deriv…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="small muted">Tap a row for its breakdown. Forex, commodities and Boom/Crash have no Over/Under digit contracts on Deriv, so GoalIQ scans the synthetic indices that do.</div>
+        </div>
+      </div>
+
+      <details class="layers" id="goalBreakdown">
+        <summary>Score breakdown · <span id="bdName">top market</span></summary>
+        <div class="bd-grid">
+          <div>
+            <h4>Market Suitability Index</h4>
+            <div id="bdMsi" class="bd-bars"></div>
+          </div>
+          <div>
+            <h4>Composite score · <span id="bdStrat">—</span></h4>
+            <div id="bdComp" class="bd-bars"></div>
+          </div>
+        </div>
+        <div id="bdInd" class="small muted bd-ind"></div>
+      </details>
+
+      <details class="layers" id="goalSettings">
+        <summary>Thresholds &amp; risk limits</summary>
+        <div class="row3">
+          <label class="field"><span>S<sub>comp</sub> min · Over 2</span><input id="gMinScoreA" type="number" min="0" max="100" step="1" value="78" inputmode="decimal"></label>
+          <label class="field"><span>S<sub>comp</sub> min · Under 7</span><input id="gMinScoreB" type="number" min="0" max="100" step="1" value="88" inputmode="decimal"></label>
+          <label class="field"><span>Min EV (%)</span><input id="gMinEV" type="number" min="-100" max="100" step="0.5" value="5" inputmode="decimal"></label>
+          <label class="field"><span>Max entropy (bits)</span><input id="gMaxEntropy" type="number" min="0" max="1" step="0.01" value="0.85" inputmode="decimal"></label>
+          <label class="field"><span>Min payout eff. (%)</span><input id="gMinRTP" type="number" min="0" max="100" step="0.5" value="92" inputmode="decimal"></label>
+          <label class="field"><span>ADX above · Over 2</span><input id="gAdxMinA" type="number" min="0" max="100" step="1" value="28" inputmode="decimal"></label>
+          <label class="field"><span>BB width below · Under 7</span><input id="gBbMaxB" type="number" min="0" step="0.05" value="1.2" inputmode="decimal"></label>
+          <label class="field"><span>RSI low · Under 7</span><input id="gRsiLoB" type="number" min="0" max="100" step="1" value="40" inputmode="decimal"></label>
+          <label class="field"><span>RSI high · Under 7</span><input id="gRsiHiB" type="number" min="0" max="100" step="1" value="60" inputmode="decimal"></label>
+          <label class="field"><span>Kelly fraction</span><input id="gKelly" type="number" min="0" max="1" step="0.05" value="0.25" inputmode="decimal"></label>
+          <label class="field"><span>Max stake (% bal.)</span><input id="gMaxStake" type="number" min="0.1" max="100" step="0.1" value="3" inputmode="decimal"></label>
+          <label class="field"><span>Daily drawdown stop (%)</span><input id="gDD" type="number" min="0" max="100" step="0.5" value="10" inputmode="decimal"></label>
+          <label class="field"><span>Daily profit lock (%)</span><input id="gLock" type="number" min="0" max="1000" step="0.5" value="15" inputmode="decimal"></label>
+        </div>
+        <p class="small muted">Loosening these lets the bot trade without a measured edge. The defaults are the GoalIQ spec.</p>
+        <button id="goalReset" class="btn ghost small-btn" type="button">Restore GoalIQ defaults</button>
+      </details>
+    </section>
+
     <!-- MARKET -->
     <section class="card" id="marketCard">
       <div class="card-head">
@@ -56,7 +128,7 @@
     <!-- SIGNAL -->
     <section class="card" id="signalCard">
       <div class="card-head">
-        <h2>AI signal</h2>
+        <h2>Six-layer signal</h2>
         <span class="muted small" id="entropyInfo"></span>
       </div>
       <div class="row">
@@ -116,22 +188,36 @@
     <!-- TRADE -->
     <section class="card" id="tradeCard">
       <div class="card-head"><h2>Trade</h2><span id="botState" class="badge">Idle</span></div>
+      <label class="field">
+        <span>Engine</span>
+        <select id="engineSelect">
+          <option value="goaliq" selected>GoalIQ-Ultimate · scans all markets</option>
+          <option value="six">Six-layer digits · selected market</option>
+        </select>
+      </label>
+      <label class="field mt" id="sizingField">
+        <span>Stake sizing</span>
+        <select id="sizingSelect">
+          <option value="kelly" selected>Quarter-Kelly (max 3% of balance)</option>
+          <option value="fixed">Fixed stake (max 3% of balance)</option>
+        </select>
+      </label>
       <div class="row">
-        <label class="field"><span>Stake (USD)</span><input id="stake" type="number" min="0.35" step="0.01" value="1" inputmode="decimal"></label>
+        <label class="field" id="stakeField"><span>Stake (USD)</span><input id="stake" type="number" min="0.35" step="0.01" value="1" inputmode="decimal"></label>
         <label class="field"><span>Ticks</span><input id="ticks" type="number" min="1" max="10" step="1" value="1" inputmode="numeric"></label>
       </div>
       <button id="tradeNow" class="btn primary wide">Trade signal now</button>
 
       <h3>Auto-trade</h3>
       <div class="row">
-        <label class="field"><span>Min confidence</span><input id="minConf" type="number" min="0" max="100" step="5" value="50" inputmode="numeric"></label>
+        <label class="field" id="minConfField"><span>Min confidence</span><input id="minConf" type="number" min="0" max="100" step="5" value="50" inputmode="numeric"></label>
         <label class="field"><span>Max trades</span><input id="maxTrades" type="number" min="1" step="1" value="20" inputmode="numeric"></label>
       </div>
       <div class="row">
         <label class="field"><span>Take profit ($)</span><input id="takeProfit" type="number" min="0" step="0.5" value="5" inputmode="decimal"></label>
         <label class="field"><span>Stop loss ($)</span><input id="stopLoss" type="number" min="0" step="0.5" value="5" inputmode="decimal"></label>
       </div>
-      <label class="check"><input id="martingale" type="checkbox"> Martingale after a loss</label>
+      <label class="check" id="martingaleWrap"><input id="martingale" type="checkbox"> Martingale after a loss</label>
       <div class="row" id="martingaleRow" hidden>
         <label class="field"><span>Multiplier</span><input id="martMult" type="number" min="1" step="0.1" value="2" inputmode="decimal"></label>
         <label class="field"><span>Max steps</span><input id="martSteps" type="number" min="1" max="10" step="1" value="3" inputmode="numeric"></label>
@@ -167,7 +253,9 @@
   </footer>
 
   <script src="/js/engine.js"></script>
+  <script src="/js/goaliq.js"></script>
   <script src="/js/deriv.js"></script>
+  <script src="/js/scanner.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

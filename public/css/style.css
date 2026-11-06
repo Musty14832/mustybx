@@ -170,15 +170,60 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .log tr.open td { color: var(--warn); }
 .log tr.empty td { color: var(--muted); text-align: center; padding: 16px; }
 
+/* ---------- GoalIQ ---------- */
+h4 { margin: 4px 0 8px; font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.mt { margin-top: 10px; }
+.card-head h2 .small { font-weight: 600; letter-spacing: 0; }
+.goal-top { display: grid; gap: 14px; }
+.goal-report { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.signal-label.go { color: var(--accent); }
+.goal-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 12px; }
+.goal-stats > div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 7px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.goal-stats span { font-size: 11px; white-space: nowrap; }
+.goal-stats strong { font-size: 14.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gates { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
+.gate { font-size: 11.5px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); white-space: nowrap; }
+.gate.ok { color: var(--good); border-color: rgba(25, 212, 139, .35); }
+.gate.no { color: #ff9aa5; border-color: rgba(255, 92, 108, .35); }
+.gate.info { color: var(--muted); }
+.risk-line { padding-top: 8px; border-top: 1px solid var(--line); }
+.goal-rank { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.rank { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.rank th, .rank td { text-align: left; padding: 7px 5px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rank th { color: var(--muted); font-weight: 600; }
+.rank tbody tr { cursor: pointer; }
+.rank td:last-child { color: var(--muted); max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+.rank tr.pass td:last-child { color: var(--good); font-weight: 800; }
+.rank tr.wait td { color: var(--muted); }
+.rank tr.sel td { background: rgba(17, 224, 161, .09); }
+.rank tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.rank tr.insp td { background: rgba(61, 139, 255, .09); }
+.rank tr.empty td { color: var(--muted); text-align: center; padding: 16px; cursor: default; }
+.bd-grid { display: grid; gap: 14px; margin-top: 10px; }
+.bd-bars { display: grid; gap: 6px; }
+.bd-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 1fr 78px; gap: 8px; align-items: center; font-size: 12.5px; }
+.bd-lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-track { height: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+.bd-fill { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.bd-val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.bd-ind { white-space: pre-line; margin-top: 10px; line-height: 1.6; }
+.row3 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.row3 .field { flex: none; }
+#goalSettings .btn { margin-top: 4px; }
+
 .foot { max-width: 1180px; margin: 0 auto; padding: 16px 16px 28px; text-align: center; }
 
 @media (min-width: 760px) {
   .topbar { grid-template-columns: auto 1fr auto auto; grid-template-areas: "brand account balance logout"; }
   .account { justify-self: center; max-width: 360px; width: 100%; }
   .grid { grid-template-columns: 1fr 1fr; }
-  #sessionCard { grid-column: 1 / -1; }
+  #sessionCard, #goalCard { grid-column: 1 / -1; }
+  .goal-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); align-items: start; }
+  .bd-grid { grid-template-columns: 1fr 1fr; }
+  .row3 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 1100px) {
   .grid { grid-template-columns: 1fr 1.25fr 1fr; }
-  #sessionCard { grid-column: 1 / -1; }
+  #sessionCard, #goalCard { grid-column: 1 / -1; }
+  .row3 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }

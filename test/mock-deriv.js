@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const E = require('../public/js/engine.js');
 
 const PORT = Number(process.env.MOCK_PORT || 4100);
+const TICK_MS = Number(process.env.MOCK_TICK_MS || 250);
 const CLIENT_ID = process.env.EXPECT_CLIENT_ID || '34QgKaYtPLMtQyvz5UhGx';
 const TOKEN = 'ory_at_test_token';
 const b64url = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -129,12 +130,51 @@ function parseFrames(state, chunk, onText, onClose) {
   }
 }
 
+// Per-symbol feeds shaped like Deriv's: decimals, step size and jumps differ by family.
+const FEEDS = {
+  '1HZ10V': { dp: 2, base: 9000, vol: 0.6 }, R_10: { dp: 3, base: 6000, vol: 0.12 },
+  '1HZ25V': { dp: 2, base: 5000, vol: 0.9 }, R_25: { dp: 3, base: 3000, vol: 0.4 },
+  '1HZ50V': { dp: 2, base: 1000, vol: 0.8 }, R_50: { dp: 4, base: 180, vol: 0.03 },
+  '1HZ75V': { dp: 2, base: 4000, vol: 1.5 }, R_75: { dp: 4, base: 400, vol: 0.06 },
+  '1HZ100V': { dp: 2, base: 1700, vol: 0.8 }, R_100: { dp: 2, base: 1300, vol: 0.6 },
+  stpRNG: { dp: 1, base: 8000, gen: 'step', noDigits: true },
+  JD10: { dp: 2, base: 9000, vol: 0.5, gen: 'jump' }, JD25: { dp: 2, base: 8000, vol: 0.7, gen: 'jump' },
+  JD50: { dp: 2, base: 7000, vol: 0.9, gen: 'jump' }, JD75: { dp: 2, base: 6000, vol: 1.1, gen: 'jump' },
+  JD100: { dp: 2, base: 5000, vol: 1.3, gen: 'jump' },
+};
+function gauss() { let u = 0; let v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 const symbols = new Map(); // live price per symbol
 function nextQuote(sym) {
-  const q = (symbols.get(sym) || 1000 + Math.random() * 100) + (Math.random() - 0.5) * 2;
+  const f = FEEDS[sym];
+  let q = symbols.has(sym) ? symbols.get(sym) : f.base;
+  if (f.gen === 'step') q += Math.random() < 0.5 ? -0.1 : 0.1;
+  else q += gauss() * f.vol + (f.gen === 'jump' && Math.random() < 0.003 ? (Math.random() < 0.5 ? -1 : 1) * 30 * f.vol : 0);
+  q = Number(q.toFixed(f.dp));
   symbols.set(sym, q);
-  return Math.round(q * 100) / 100;
+  return q;
 }
+const DIGIT_TYPES = ['DIGITDIFF', 'DIGITMATCH', 'DIGITEVEN', 'DIGITODD', 'DIGITOVER', 'DIGITUNDER'];
+function fairChance(type, barrier) {
+  const b = parseInt(barrier, 10);
+  return { DIGITDIFF: 0.9, DIGITMATCH: 0.1, DIGITEVEN: 0.5, DIGITODD: 0.5, DIGITOVER: (9 - b) / 10, DIGITUNDER: b / 10 }[type];
+}
+const payoutFor = (amount, type, barrier) => Math.round((amount / fairChance(type, barrier)) * 0.955 * 100) / 100;
+function validateContract(p) {
+  const errs = [];
+  if (!FEEDS[p.underlying_symbol]) return ['InvalidSymbol: unknown underlying_symbol'];
+  if (!DIGIT_TYPES.includes(p.contract_type)) errs.push('contract_type');
+  else if (FEEDS[p.underlying_symbol].noDigits) return ['OfferingsValidationError: Trading is not offered for this asset.'];
+  if (['DIGITDIFF', 'DIGITMATCH', 'DIGITOVER', 'DIGITUNDER'].includes(p.contract_type) && !/^\d$/.test(String(p.barrier))) errs.push('barrier');
+  if (p.contract_type === 'DIGITOVER' && Number(p.barrier) > 8) errs.push('barrier');
+  if (p.contract_type === 'DIGITUNDER' && Number(p.barrier) < 1) errs.push('barrier');
+  if (!(p.amount >= 0.35)) errs.push('amount');
+  if (p.basis !== 'stake') errs.push('basis');
+  if (p.duration_unit !== 't' || !(p.duration >= 1 && p.duration <= 10)) errs.push('duration');
+  if (p.symbol) errs.push('legacy field "symbol" sent');
+  if (p.currency !== 'USD') errs.push('currency');
+  return errs;
+}
+const proposals = new Map();
 
 server.on('upgrade', (req, socket) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -168,17 +208,21 @@ server.on('upgrade', (req, socket) => {
     if (m.ping) return send({ ...base, msg_type: 'ping', ping: 'pong' });
 
     if (isPublic && m.ticks_history) {
+      const f = FEEDS[m.ticks_history];
+      if (!f) return send({ ...base, msg_type: 'history', error: { code: 'InvalidSymbol', message: 'Symbol not found' } });
       const prices = Array.from({ length: Math.min(m.count || 100, 1000) }, () => nextQuote(m.ticks_history));
-      return send({ ...base, msg_type: 'history', pip_size: 2, history: { prices, times: prices.map((_, i) => 1700000000 + i) } });
+      return send({ ...base, msg_type: 'history', pip_size: f.dp, history: { prices, times: prices.map((_, i) => 1700000000 + i) } });
     }
     if (isPublic && m.ticks) {
       const sym = m.ticks;
+      const f = FEEDS[sym];
+      if (!f) return send({ ...base, msg_type: 'tick', error: { code: 'InvalidSymbol', message: 'Symbol not found' } });
       const id = crypto.randomBytes(4).toString('hex');
       const t = setInterval(() => {
         const q = nextQuote(sym);
-        lastDigitBySym.set(sym, E.lastDigit(q, 2));
-        send({ echo_req: m, req_id: m.req_id, msg_type: 'tick', tick: { quote: q, symbol: sym, pip_size: 2, epoch: Math.floor(Date.now() / 1000), id }, subscription: { id } });
-      }, 200);
+        lastDigitBySym.set(sym, E.lastDigit(q, f.dp));
+        send({ echo_req: m, req_id: m.req_id, msg_type: 'tick', tick: { quote: q, symbol: sym, pip_size: f.dp, epoch: Math.floor(Date.now() / 1000), id }, subscription: { id } });
+      }, TICK_MS);
       timers.add(t);
       tickSubs.set(id, t);
       return undefined;
@@ -195,33 +239,47 @@ server.on('upgrade', (req, socket) => {
       return send({ ...base, msg_type: 'balance', balance: { balance, currency: 'USD', loginid: 'DOT90004580' }, subscription: { id: 'bal1' } });
     }
 
+    if (!isPublic && m.proposal) {
+      const errs = validateContract(m);
+      if (errs.length) {
+        const code = errs[0].startsWith('OfferingsValidationError') ? 'OfferingsValidationError' : errs[0].startsWith('InvalidSymbol') ? 'InvalidSymbol' : 'InputValidationFailed';
+        return send({ ...base, msg_type: 'proposal', error: { code, message: errs.join(', ').replace(/^\w+: /, '') } });
+      }
+      const id = crypto.randomBytes(8).toString('hex');
+      proposals.set(id, { ...m });
+      const payout = payoutFor(m.amount, m.contract_type, m.barrier);
+      return send({ ...base, msg_type: 'proposal', proposal: { id, ask_price: m.amount, payout, spot: symbols.get(m.underlying_symbol) || FEEDS[m.underlying_symbol].base, longcode: `${m.contract_type} ${m.barrier}` } });
+    }
+
     if (!isPublic && m.buy) {
-      const p = m.parameters || {};
-      const errs = [];
-      if (m.buy !== '1') errs.push('buy must be "1" with parameters');
-      if (!(p.amount >= 0.35)) errs.push('amount');
-      if (p.basis !== 'stake') errs.push('basis');
-      if (!['DIGITDIFF', 'DIGITMATCH', 'DIGITEVEN', 'DIGITODD', 'DIGITOVER', 'DIGITUNDER'].includes(p.contract_type)) errs.push('contract_type');
-      if (['DIGITDIFF', 'DIGITMATCH', 'DIGITOVER', 'DIGITUNDER'].includes(p.contract_type) && !/^\d$/.test(String(p.barrier))) errs.push('barrier');
-      if (p.duration_unit !== 't' || !(p.duration >= 1 && p.duration <= 10)) errs.push('duration');
-      if (!p.underlying_symbol) errs.push('underlying_symbol');
-      if (p.symbol) errs.push('legacy field "symbol" sent');
-      if (p.currency !== 'USD') errs.push('currency');
-      if (typeof m.price !== 'number') errs.push('price');
-      if (errs.length) return send({ ...base, msg_type: 'buy', error: { code: 'InputValidationFailed', message: errs.join(', ') } });
+      let p;
+      if (m.buy === '1') {
+        p = m.parameters || {};
+        const errs = validateContract(p);
+        if (typeof m.price !== 'number') errs.push('price');
+        if (errs.length) return send({ ...base, msg_type: 'buy', error: { code: 'InputValidationFailed', message: errs.join(', ') } });
+        calls.push(`BUY-DIRECT ${p.underlying_symbol} ${p.contract_type} ${p.barrier ?? ''}`);
+      } else {
+        p = proposals.get(m.buy);
+        if (!p) return send({ ...base, msg_type: 'buy', error: { code: 'InvalidContractProposal', message: 'Proposal expired or unknown' } });
+        if (typeof m.price !== 'number' || m.price < p.amount) return send({ ...base, msg_type: 'buy', error: { code: 'PriceMoved', message: 'Price moved' } });
+        proposals.delete(m.buy);
+        calls.push(`BUY-ID ${p.underlying_symbol} ${p.contract_type} ${p.barrier ?? ''} ${p.amount}`);
+      }
 
       const contractId = Math.floor(Math.random() * 1e9);
       balance = Math.round((balance - p.amount) * 100) / 100;
-      send({ ...base, msg_type: 'buy', buy: { balance_after: balance, buy_price: p.amount, contract_id: contractId, longcode: `${p.contract_type} ${p.barrier ?? ''}`, payout: p.amount * 2, purchase_time: Date.now() / 1000, shortcode: 'X', start_time: Date.now() / 1000, transaction_id: contractId + 1 } });
-      const mult = { DIGITDIFF: 0.095, DIGITMATCH: 8.0, DIGITEVEN: 0.95, DIGITODD: 0.95, DIGITOVER: 0.6, DIGITUNDER: 0.6 }[p.contract_type];
+      const payout = payoutFor(p.amount, p.contract_type, p.barrier);
+      send({ ...base, msg_type: 'buy', buy: { balance_after: balance, buy_price: p.amount, contract_id: contractId, longcode: `${p.contract_type} ${p.barrier ?? ''}`, payout, purchase_time: Date.now() / 1000, shortcode: 'X', start_time: Date.now() / 1000, transaction_id: contractId + 1 } });
+      const dp = FEEDS[p.underlying_symbol].dp;
       const exitQuote = nextQuote(p.underlying_symbol);
-      const exitDigit = E.lastDigit(exitQuote, 2);
+      const exitDigit = E.lastDigit(exitQuote, dp);
       const won = E.settles(p.contract_type, p.barrier, exitDigit);
-      const profit = won ? Math.round(p.amount * mult * 100) / 100 : -p.amount;
+      const profit = won ? Math.round((payout - p.amount) * 100) / 100 : -p.amount;
       calls.push(`SETTLE ${p.contract_type} ${p.barrier ?? '-'} exit=${exitDigit} ${won ? 'won' : 'lost'}`);
-      settlements.set(contractId, { won, exitDigit, profit, exitQuote });
+      settlements.set(contractId, { won, exitDigit, profit, exitQuote: exitQuote.toFixed(dp) });
       setTimeout(() => {
-        if (won) balance = Math.round((balance + p.amount + profit) * 100) / 100;
+        if (won) balance = Math.round((balance + payout) * 100) / 100;
         if (balanceSub) send({ echo_req: balanceSub.m, req_id: balanceSub.m.req_id, msg_type: 'balance', balance: { balance, currency: 'USD' }, subscription: { id: 'bal1' } });
       }, 500);
       return undefined;
@@ -233,7 +291,7 @@ server.on('upgrade', (req, socket) => {
       if (!st8) return send({ ...base, msg_type: 'proposal_open_contract', error: { code: 'ContractNotFound', message: 'unknown contract' } });
       send({ ...base, msg_type: 'proposal_open_contract', proposal_open_contract: { contract_id: m.contract_id, contract_type: 'X', currency: 'USD', status: 'open', is_sold: 0 }, subscription: { id: sid } });
       setTimeout(() => {
-        send({ ...base, msg_type: 'proposal_open_contract', proposal_open_contract: { contract_id: m.contract_id, contract_type: 'X', currency: 'USD', status: st8.won ? 'won' : 'lost', is_sold: 1, profit: String(st8.profit), exit_tick_display_value: st8.exitQuote.toFixed(2) }, subscription: { id: sid } });
+        send({ ...base, msg_type: 'proposal_open_contract', proposal_open_contract: { contract_id: m.contract_id, contract_type: 'X', currency: 'USD', status: st8.won ? 'won' : 'lost', is_sold: 1, profit: String(st8.profit), exit_tick_display_value: st8.exitQuote }, subscription: { id: sid } });
       }, 400);
       return undefined;
     }
